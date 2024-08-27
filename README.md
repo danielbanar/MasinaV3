@@ -233,8 +233,8 @@ Now click on **open remote terminal** enter your pi's credentials and run `sudo 
 ttyUSB0: connected to MOBILE
     "Huawei Mobile Broadband"
 ```
-Enter this gstreamer command: `gst-launch-1.0 rpicamsrc bitrate=500000 preview=false ! video/x-h264,width=480, height=360,framerate=30/1 ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=your.ddns.net port=2222`
-replace the "your.ddns.net" with your ddns or your [public ip address](http://checkip.amazonaws.com).
+Enter this gstreamer command: `gst-launch-1.0 rpicamsrc bitrate=500000 preview=false ! video/x-h264,width=480, height=360,framerate=30/1 ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=your_ddns port=2222`
+replace the "your_ddns" with your ddns or your [public ip address](http://checkip.amazonaws.com).
 
 On your computer navigate to your gstreamer folder, the default should be: `C:\gstreamer\1.0\msvc_x86_64\bin` open a terminal here by holding `Shift` and `Right click` and click on Open in Terminal/Open powershell window here.
 Paste this command to the terminal: `gst-launch-1.0.exe udpsrc port=2222 ! application/x-rtp,encoding-name=H264,payload=96 ! rtph264depay ! avdec_h264 ! fpsdisplaysink sync=false`
@@ -252,7 +252,7 @@ Description=Camera Stream
 After=NetworkManager.service
 
 [Service]
-ExecStart=gst-launch-1.0 rpicamsrc rotation=180 bitrate=0 quantisation-parameter=32 preview=false ! video/x-h264,width=480,height=360,framerate=40/1 ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=your.ddns.net port=2222
+ExecStart=gst-launch-1.0 rpicamsrc rotation=180 bitrate=0 quantisation-parameter=32 preview=false ! video/x-h264,width=480,height=360,framerate=40/1 ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=your_ddns port=2222
 Restart=always
 RestartSec=5
 
@@ -277,7 +277,7 @@ filename="/home/pi/videos/video_$timestamp.mkv"
 gst-launch-1.0 rpicamsrc rotation=180 bitrate=0 quantisation-parameter=32 preview=false ! \
     video/x-h264,width=480,height=360,framerate=40/1 ! h264parse ! \
     tee name=t ! \
-    queue ! rtph264pay config-interval=1 pt=96 ! udpsink host=your.ddns.net port=2222 \
+    queue ! rtph264pay config-interval=1 pt=96 ! udpsink host=your_ddns port=2222 \
     t. ! \
     queue ! matroskamux ! filesink location=$filename
 
