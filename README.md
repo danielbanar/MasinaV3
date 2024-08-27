@@ -7,12 +7,12 @@ This guide provides detailed instructions on how to build a FPV drone capable of
 
 ## Features
 * **Dual Control:** Control a drone using either an ELRS transmitter for local control or a 4G modem for remote control.
-* **Low Latency Video:** Real time video transmission with minimal delay (100ms)
-* **Safe connection disruptions handling**: Hover then Land/Return to launch
+* **Low Latency Video:** Real time video transmission with minimal delay (100ms).
+* **Safe connection disruptions handling**: Hover then Land/Return to launch.
 * **Real time GPS Tracking:** Track drone location live using a Traccar server.
 * **Backup GPS Tracking via SMS:** Track drone location using SMS commands, in case of loss of signal/electronics failure.
 * **Extended Range:** Achieve significantly greater range through 4G compared to traditional radio control.
-* **On screen display (OSD):** Telemetry data overlaid on the video feed, including: **Battery Level, Compass, GPS Coordinates, Speed**
+* **On screen display (OSD):** Telemetry data overlaid on the video feed, including: **Battery Level, Compass, GPS Coordinates, Speed**.
 
 ## Videos
 #### [Successful 20km drone flight | FPV over 4G - YouTube](https://youtu.be/IMyPImF74hA)
@@ -92,9 +92,9 @@ This guide provides detailed instructions on how to build a FPV drone capable of
 
 
 ### Preparing the Raspberry Pi
-1. Plug the camera to the csi port
-2. Power it on
-3. SSH into the raspberry pi
+1. Plug the camera to the CSI port.
+2. Power it on.
+3. SSH into the raspberry pi.
 4. Enable the legacy camera interface and serial port using: `sudo raspi-config` and navigate to **Interface Options**
     1. Legacy Camera > Yes
     2. Serial Port > No > Yes
