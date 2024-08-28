@@ -37,7 +37,7 @@ This guide provides detailed instructions on how to build a FPV drone capable of
 * Reliable 4G coverage, internet speed 200kB/s and more recommended.
 * SIM card with enough data.
 * Configured betaflight on your drone.
-* [GStreamer](https://gstreamer.freedesktop.org/download) installed on your system (MSVC 64-bit runtime and development).
+* [GStreamer](https://gstreamer.freedesktop.org/download) installed on your system (MSVC 64-bit runtime and development) and Visual Studio.
 * Intermediate soldering knowledge.
 
 ## Tools
@@ -301,20 +301,33 @@ RestartSec=5
 WantedBy=default.target
 ```
 Enable the service: `sudo systemctl enable cam_stream.service`
-### Controls and telemetry
-Create a new service: `sudo nano /etc/systemd/system/telemetry.service`
+
+### Controls and telemetry (Pi)
+Download the source: `git clone https://github.com/danielbanar/MasinaV3.git`
+
+Enter the folder: `cd client`
+Edit the DDNS to yours: `sudo nano client.cpp` by changing the string on this line `#define HOSTNAME "your_ddns"`
+
+Compile it by running: `make`
+
+Create a new service: `sudo nano /etc/systemd/system/client.service`
 ```
 [Unit]
-Description=Telemetry
+Description=UDP Client
 After=NetworkManager.service
 
 [Service]
-ExecStart=sudo /home/pi/telemetry/client
+ExecStart=sudo /home/pi/client/client
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=default.target
 ```
+
+### Controls and telemetry (PC)
+Download this repository on your pc and open the solution file in Visual Studio inside `pc\UDP_Server\UDP_Server.sln`.
+
+Compile it preferrably in **Release, x64**.
 ## Troubleshooting
 
