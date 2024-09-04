@@ -203,8 +203,8 @@ wlan0: connected to your_wifi
 ```
 ### Connecting to home
 #### Method 1: PiTunnel (recommended)
-Open https://www.pitunnel.com create an account and follow instrucions.
-Open UDP ports ***2222-2224*** on your router.
+* Open https://www.pitunnel.com create an account and follow instrucions.
+* Ensure UDP ports 2222-2224 are open on your router.
 
 #### Method 2: WireGuard VPN (use if you have linux server/pc at home)
 * Setup WireGuard server on your home network: https://www.pivpn.io
@@ -219,22 +219,25 @@ sudo systemctl start wg-quick@wg0.service
 ```
 
 ### Setting up Dynamic DNS
-You probably want to setup a DDNS so you dont have to change the IP every every day or when restart your. In my case I could setup DDNS directly in my router, I just created an account on www.noip.com and created my free DNS, then I just added my login credentials into a DDNS setting on my router's admin panel. But not every router has that option. But there are different ways to get it working, just look up some tutorials.
+Setting up Dynamic DNS (DDNS) allows you to avoid constantly changing the IP address whenever your network restarts. If your router supports DDNS, you can set it up directly. For example, you can create a free account on [No-IP](www.noip.com) and add your login credentials to your router's DDNS settings.
+
+>If your router doesn't support DDNS, look up alternative methods and tutorials online to achieve this.
 
 ### Testing
 
 At this point we should have working video stream over 4G.
 So let's test it. First make sure we are connected to the 4G network by turning off the wifi network we setup just for this or if you used usb ethernet adapter unplug it.
 
-Open [PiTunnel devices tab](https://www.pitunnel.com/devices) and make sure its online. 
+Open [PiTunnel](https://www.pitunnel.com/devices) devices tab to verify your Raspberry Pi is online.
 
-Now click on **open remote terminal** enter your pi's credentials and run `sudo nmcli` and you should get 
+Click on Open Remote Terminal, enter your Pi's credentials, and run the command sudo nmcli. You should see:
 ```
 ttyUSB0: connected to MOBILE
     "Huawei Mobile Broadband"
 ```
-Enter this gstreamer command: `gst-launch-1.0 rpicamsrc bitrate=500000 preview=false ! video/x-h264,width=480, height=360,framerate=30/1 ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=your_ddns port=2222`
-replace the "your_ddns" with your ddns or your [public ip address](http://checkip.amazonaws.com).
+Enter the following GStreamer command, replacing your_ddns with your DDNS or [public IP address](http://checkip.amazonaws.com): 
+`gst-launch-1.0 rpicamsrc bitrate=500000 preview=false ! video/x-h264,width=480, height=360,framerate=30/1 ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=your_ddns port=2222`
+
 
 On your computer navigate to your gstreamer folder, the default should be: `C:\gstreamer\1.0\msvc_x86_64\bin` open a terminal here by holding `Shift` and `Right click` and click on Open in Terminal/Open powershell window here.
 Paste this command to the terminal: `gst-launch-1.0.exe udpsrc port=2222 ! application/x-rtp,encoding-name=H264,payload=96 ! rtph264depay ! avdec_h264 ! fpsdisplaysink sync=false`
@@ -242,7 +245,7 @@ And video window should appear and everything should be working.
 > If nothing opens make sure you did not get any errors on the raspberry pi. Otherwise your firewall is probably blocking the port 2222. If you are using different antivirus than windows defenter open the antivirus control panel and try disabling firewall. Then go to **Windows Defender Firewall with Advanced Security** settings by typing it into start. Now on top left click on Inbound Rules and in the top right click New Rule > Port > UDP, Specific remote ports: 2222-2224 > Allow the connection > name it whatever you like > Finish. To be extra sure do the same in Outbound Rules.
 
 ### Autostart video
-Here you can choose if you also want to record the video to a SD card.
+Here you can choose whether you also want to record the video to a SD card.
 
 #### Stream only
 Create the stream service: `sudo nano /etc/systemd/system/cam_stream.service`
@@ -282,7 +285,7 @@ gst-launch-1.0 rpicamsrc rotation=180 bitrate=0 quantisation-parameter=32 previe
     queue ! matroskamux ! filesink location=$filename
 
 ```
-Modify the permissions: `sudo chmod +x stream_and_save.sh`
+Modify the script permissions: `sudo chmod +x stream_and_save.sh`
 
 Create a folder for videos: `sudo mkdir videos`
 
@@ -326,8 +329,31 @@ WantedBy=default.target
 ```
 
 ### Controls and telemetry (PC)
-Download this repository on your pc and open the solution file in Visual Studio inside `pc\UDP_Server\UDP_Server.sln`.
+Download the repository on your PC and open the solution file in Visual Studio: `pc\UDP_Server\UDP_Server.sln`.
 
-Compile it preferrably in **Release, x64**.
+Compile the project, preferably in **Release, x64**.
+
+### Video
+add the gstreamer folder to your PATH environment variable by running this command as an administrator, or wherever you installed it
+
+`setx PATH "%PATH%;C:\gstreamer\1.0\mingw_x86_64\bin"`
+
+Now you have two choices:
+1. Run one of these gstreamer commands: 
+```
+-No frame info
+gst-launch-1.0.exe udpsrc port=2222 ! application/x-rtp,encoding-name=H264,payload=96 ! rtph264depay ! avdec_h264 ! autovideosink sync=false
+
+-With frame info
+gst-launch-1.0.exe udpsrc port=2222 ! application/x-rtp,encoding-name=H264,payload=96 ! rtph264depay ! avdec_h264 ! fpsdisplaysink sync=false
+
+-Frame info with scaled font (change the resolution to your own)
+gst-launch-1.0.exe udpsrc port=2222 ! application/x-rtp,encoding-name=H264,payload=96 ! rtph264depay ! avdec_h264 ! videoscale ! video/x-raw,width=1280,height=960 ! fpsdisplaysink sync=false
+
+
+```
+2. Create a executable by compiling the solution: `pc\UDP_Server\UDP_Video.sln`.
+
+### Explanation
 ## Troubleshooting
 
