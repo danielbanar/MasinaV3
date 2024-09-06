@@ -84,7 +84,7 @@ A Raspberry Pi communicates with a remote server (PC) using UDP sockets, relayin
     3. [TS5A23157 Switch Module](https://www.aliexpress.com/item/1005005946760421.html) - 2€
 
 ## Schematics
-![Schematics](schematics.png "Schematics")
+![Schematics](schematics_transparent.png "Schematics")
 
 ## Setup
 ### Preparing the SD Card
