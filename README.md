@@ -33,7 +33,10 @@ A Raspberry Pi communicates with a remote server (PC) using UDP sockets, relayin
 ## Legal Compliance Notice:
 ***Before operating your FPV drone, it is crucial to check and comply with all local laws and regulations related to drone usage, especially those concerning airspace, privacy, and the use of wireless communication systems. Ignoring these laws can lead to serious legal consequences, including fines or other penalties. Always ensure that your drone operations are within the boundaries of the law to promote safe and responsible flying.***
 
-
+## Images
+![Front](images/front.png "Front")
+![Left](images/left.png "Left")
+![Right](images/right.png "Right")
 ## Prerequisites
 * Make sure you have access to your router's port forwarding settings.
 * Stable internet connection at home.
@@ -84,7 +87,7 @@ A Raspberry Pi communicates with a remote server (PC) using UDP sockets, relayin
     3. [TS5A23157 Switch Module](https://www.aliexpress.com/item/1005005946760421.html) - 2€
 
 ## Schematics
-![Schematics](schematics_transparent.png "Schematics")
+![Schematics](images/schematics_transparent.png "Schematics")
 
 ## Setup
 ### Preparing the SD Card
