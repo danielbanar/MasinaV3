@@ -1,11 +1,11 @@
 # FPV Drone over 4G (Masina V3)
 ## Overview
 
-This guide provides detailed instructions on how to build a FPV drone capable of long range flight using a combination of 4G connectivity and/or ELRS radio control. The drone transmits live video feed to a computer over the 4G network with approximately 100ms latency. Operate it using standard Xbox or PlayStation controllers. The system also includes on-screen display (OSD) information, live GPS tracking, and safe handling features in case of a connection loss.
+This guide provides detailed instructions on how to build a FPV drone capable of long range flight using a combination of 4G connectivity and/or ELRS radio control. The drone transmits live video feed to a computer over the 4G network with latency as low as 100ms. Operate it using standard Xbox or PlayStation controllers. The system also includes on-screen display (OSD) information, live GPS tracking, and safe handling features in case of a connection loss.
 
 ## Features
 * **Dual Control:** Control a drone using either an ELRS transmitter for local control or a 4G modem for remote control.
-* **Low Latency Video:** Real time video transmission with minimal delay (100ms).
+* **Low Latency Video:** Real time video transmission with minimal delay (100ms, 140ms for HD).
 * **Safe connection disruptions handling**: Hover then Land/Return to launch.
 * **Real time GPS Tracking:** Track drone location live using a Traccar server.
 * **Backup GPS Tracking via SMS:** Track drone location using SMS commands, in case of loss of signal/electronics failure.
