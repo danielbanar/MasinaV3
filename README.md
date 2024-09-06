@@ -242,7 +242,7 @@ Enter the following GStreamer command, replacing your_ddns with your DDNS or [pu
 On your computer navigate to your gstreamer folder, the default should be: `C:\gstreamer\1.0\msvc_x86_64\bin` open a terminal here by holding `Shift` and `Right click` and click on Open in Terminal/Open powershell window here.
 Paste this command to the terminal: `gst-launch-1.0.exe udpsrc port=2222 ! application/x-rtp,encoding-name=H264,payload=96 ! rtph264depay ! avdec_h264 ! fpsdisplaysink sync=false`
 And video window should appear and everything should be working.
-> If nothing opens make sure you did not get any errors on the raspberry pi. Otherwise your firewall is probably blocking the port 2222. If you are using different antivirus than windows defenter open the antivirus control panel and try disabling firewall. Then go to **Windows Defender Firewall with Advanced Security** settings by typing it into start. Now on top left click on Inbound Rules and in the top right click New Rule > Port > UDP, Specific remote ports: 2222-2224 > Allow the connection > name it whatever you like > Finish. To be extra sure do the same in Outbound Rules.
+>  If nothing opens, check for errors on the Raspberry Pi. Otherwise ensure your firewall isn't blocking the port 2222. If using a third-party antivirus, disable its firewall. Then go to **Windows Defender Firewall with Advanced Security** settings. Now on top left click on Inbound Rules and in the top right click New Rule > Port > UDP, Specific remote ports: 2222-2224 > Allow the connection > name it whatever you like > Finish. Repeat the same in Outbound Rules.
 
 ### Autostart video
 Here you can choose whether you also want to record the video to a SD card.
@@ -334,11 +334,11 @@ Download the repository on your PC and open the solution file in Visual Studio: 
 Compile the project, preferably in **Release, x64**.
 
 ### Video
-add the gstreamer folder to your PATH environment variable by running this command as an administrator, or wherever you installed it
+Add the gstreamer folder to your PATH environment variable by running this command as an administrator, or wherever you installed it.
 
 `setx PATH "%PATH%;C:\gstreamer\1.0\mingw_x86_64\bin"`
 
-Now you have two choices:
+#### Now you have two choices:
 1. Run one of these gstreamer commands: 
 ```
 -No frame info
@@ -349,11 +349,10 @@ gst-launch-1.0.exe udpsrc port=2222 ! application/x-rtp,encoding-name=H264,paylo
 
 -Frame info with scaled font (change the resolution to your own)
 gst-launch-1.0.exe udpsrc port=2222 ! application/x-rtp,encoding-name=H264,payload=96 ! rtph264depay ! avdec_h264 ! videoscale ! video/x-raw,width=1280,height=960 ! fpsdisplaysink sync=false
-
-
 ```
 2. Create a executable by compiling the solution: `pc\UDP_Server\UDP_Video.sln`.
 
 ### Explanation
+The Raspberry Pi communicates with a remote server (PC) using UDP sockets, relaying Crossfire (CRSF) telemetry data from the flight controller to the server. The server (PC) reads the positions of analog sticks (thrust, pitch, roll, and yaw) from a controller and sends this information to the Raspberry Pi. The Pi then encodes the received data into valid Crossfire protocol frames and sends them to the flight controller via the serial port. On the PC, telemetry data is decoded and parsed from the Crossfire frames, overlaying this information onto a video window. The system includes safety mechanisms such as CRC-based error detection, reconnection protection, and out-of-order data handling. If the connection is lost for more than 250 ms, the drone stabilizes, and if the connection is not reestablished within 10 seconds, the drone either lands or returns to its launch point, according to the user's settings.
 ## Troubleshooting
 
