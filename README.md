@@ -1,9 +1,9 @@
 # FPV Drone over 4G
 ## Overview
 
-This guide provides detailed instructions on how to build a FPV drone capable of long range flight using a combination of 4G connectivity and/or ELRS radio control. The drone transmits live video feed to a computer over the 4G network with approximately 100ms latency in SD and HD quality. Operate it using standard Xbox or PlayStation controllers. The system also includes on-screen display (OSD) information, live GPS tracking, and safe handling features in case of a connection loss.
+This guide provides detailed instructions on how to build a FPV drone capable of long range flight using a combination of 4G connectivity and/or ELRS radio control. The drone transmits live video feed to a computer over the 4G network with approximately 100ms latency. Operate it using standard Xbox or PlayStation controllers. The system also includes on-screen display (OSD) information, live GPS tracking, and safe handling features in case of a connection loss.
 
->Note for Beginners: ELRS (ExpressLRS) is an open-source, low-latency, long-range radio control system popular in FPV drones for its reliability and performance.
+>ELRS (ExpressLRS) is an open-source, low-latency, long-range radio control system popular in FPV drones for its reliability and performance.
 
 ## Features
 * **Dual Control:** Control a drone using either an ELRS transmitter for local control or a 4G modem for remote control.
@@ -13,6 +13,9 @@ This guide provides detailed instructions on how to build a FPV drone capable of
 * **Backup GPS Tracking via SMS:** Track drone location using SMS commands, in case of loss of signal/electronics failure.
 * **Extended Range:** Achieve significantly greater range through 4G compared to traditional radio control.
 * **On screen display (OSD):** Telemetry data overlaid on the video feed, including: **Battery Level, Compass, GPS Coordinates, Speed**.
+
+### Explanation
+A Raspberry Pi communicates with a remote server (PC) using UDP sockets, relaying Crossfire (CRSF) telemetry data from the flight controller to the server. A server (PC) reads the positions of analog sticks (thrust, pitch, roll, and yaw) from a controller and sends this information to the Raspberry Pi. The Pi then encodes the received data into valid Crossfire protocol frames and sends them to the flight controller via the serial port. On the PC, telemetry data is decoded and parsed from the Crossfire telemetry frames, overlaying this information onto a video window. The system includes safety mechanisms such as CRC-based error detection, reconnection protection, and out-of-order data handling. If the connection is lost for more than 250 ms, the drone stabilizes, and if the connection is not reestablished within 10 seconds, the drone either lands or returns to its launch point, according to the user's settings.
 
 ## Videos
 #### [Successful 20km drone flight | FPV over 4G - YouTube](https://youtu.be/IMyPImF74hA)
@@ -79,6 +82,9 @@ This guide provides detailed instructions on how to build a FPV drone capable of
     1. ELRS Receiver - 12€
     2. ELRS Controller (e.g. Radiomaster pocket 2.4GHz 250mW) - 70€
     3. [TS5A23157 Switch Module](https://www.aliexpress.com/item/1005005946760421.html) - 2€
+
+## Schematics
+![Schematics](schematics.png "Schematics")
 
 ## Setup
 ### Preparing the SD Card
@@ -352,7 +358,6 @@ gst-launch-1.0.exe udpsrc port=2222 ! application/x-rtp,encoding-name=H264,paylo
 ```
 2. Create a executable by compiling the solution: `pc\UDP_Server\UDP_Video.sln`.
 
-### Explanation
-The Raspberry Pi communicates with a remote server (PC) using UDP sockets, relaying Crossfire (CRSF) telemetry data from the flight controller to the server. The server (PC) reads the positions of analog sticks (thrust, pitch, roll, and yaw) from a controller and sends this information to the Raspberry Pi. The Pi then encodes the received data into valid Crossfire protocol frames and sends them to the flight controller via the serial port. On the PC, telemetry data is decoded and parsed from the Crossfire frames, overlaying this information onto a video window. The system includes safety mechanisms such as CRC-based error detection, reconnection protection, and out-of-order data handling. If the connection is lost for more than 250 ms, the drone stabilizes, and if the connection is not reestablished within 10 seconds, the drone either lands or returns to its launch point, according to the user's settings.
-## Troubleshooting
 
+## Troubleshooting
+[Discord](https://discord.gg/Z7jq2a89)
