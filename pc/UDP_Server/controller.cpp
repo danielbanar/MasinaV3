@@ -25,134 +25,88 @@ int16_t CRC16(uint16_t* data, size_t length) {
 
 	return crc;
 }
-Controller::Controller(int i) : controllerIndex(i), nPacketNumber(0), Buttons(0), LT(0), RT(0), LX(0), LY(0), RX(0), RY(0)
+Controller::Controller(int i) : controllerIndex(i), nPacketNumber(0)
 {
-#ifdef _WIN32
-	ZeroMemory(&state, sizeof(XINPUT_STATE));
-#else
-	SDL_Init(SDL_INIT_GAMECONTROLLER);
-	sdlController = SDL_GameControllerOpen(controllerIndex);
-#endif
+	SDL_Init(SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER);
+	if (SDL_NumJoysticks() < 1)
+		std::cerr << "[Controller] No controller detected!\n";
+	sdlController = SDL_JoystickOpen(controllerIndex);
+	if (!sdlController)
+		return;
+	printf("[Controller] %s connected (%d)\t%d Axis %d Buttons\n", SDL_JoystickName(sdlController), controllerIndex, SDL_JoystickNumAxes(sdlController), SDL_JoystickNumButtons(sdlController));
 }
 Controller::~Controller()
 {
-#ifdef _WIN32
-
-#else
 	if (sdlController != nullptr)
-		SDL_GameControllerClose(sdlController);
-
-#endif
+		SDL_JoystickClose(sdlController);
+	SDL_Quit();
 }
 void Controller::Poll()
 {
 	nPacketNumber++;
-#ifdef _WIN32
-	DWORD dwResult = XInputGetState(controllerIndex, &state); // Get controller state
-	static WORD prevButtons = 0;
-	if (dwResult == ERROR_SUCCESS)
-	{
-		Buttons = state.Gamepad.wButtons;
-		LT = state.Gamepad.bLeftTrigger;
-		RT = state.Gamepad.bRightTrigger;
-		LX = state.Gamepad.sThumbLX;
-		LY = state.Gamepad.sThumbLY;
-		RX = state.Gamepad.sThumbRX;
-		RY = state.Gamepad.sThumbRY;
-		if ((Buttons & XINPUT_GAMEPAD_BACK) && !(prevButtons & XINPUT_GAMEPAD_BACK))//ARM
-			SA = !SA;
-		if ((Buttons & XINPUT_GAMEPAD_DPAD_LEFT) && !(prevButtons & XINPUT_GAMEPAD_DPAD_LEFT))//FM
-			SB = !SB;
-		if ((Buttons & XINPUT_GAMEPAD_DPAD_RIGHT) && !(prevButtons & XINPUT_GAMEPAD_DPAD_RIGHT))//FM
-			fsMode = !fsMode;
-		if ((Buttons & XINPUT_GAMEPAD_DPAD_UP) && !(prevButtons & XINPUT_GAMEPAD_DPAD_UP))//FS
-			fs = !fs;
-		SC = fs ? ((uint8_t)fsMode + 1) : 0;
-		if ((Buttons & XINPUT_GAMEPAD_START) && !(prevButtons & XINPUT_GAMEPAD_START))//LOCAL-REMOTE SWITCH
-			remote = !remote;
-		prevButtons = Buttons;
-	}
-	else
-	{
-		std::cerr << "Controller not connected." << std::endl;
-	}
-#else
+
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
 	}
 	if (sdlController != nullptr)
 	{
-		Buttons = SDL_GameControllerGetButton(sdlController, SDL_CONTROLLER_BUTTON_LEFTSHOULDER) * 256;
-		LT = SDL_GameControllerGetAxis(sdlController, SDL_CONTROLLER_AXIS_TRIGGERLEFT) / 128;
-		RT = SDL_GameControllerGetAxis(sdlController, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) / 128;
-		LX = SDL_GameControllerGetAxis(sdlController, SDL_CONTROLLER_AXIS_LEFTX);
-		LY = SDL_GameControllerGetAxis(sdlController, SDL_CONTROLLER_AXIS_LEFTY);
-		RX = SDL_GameControllerGetAxis(sdlController, SDL_CONTROLLER_AXIS_RIGHTX);
-		RY = SDL_GameControllerGetAxis(sdlController, SDL_CONTROLLER_AXIS_RIGHTY);
+		static int num_axes = SDL_JoystickNumAxes(sdlController);
+		static int num_buttons = SDL_JoystickNumButtons(sdlController);
+		static bool lastButton = false;
+		if (num_axes < 8 || num_buttons < 1)
+			std::cerr << "[Controller] Unsupported controller - not enough axis/buttons (min 8/1)\n";
+		for (int i = 0; i < num_axes; ++i)
+			axis[i] = SDL_JoystickGetAxis(sdlController, i);
+		for (int i = 0; i < num_buttons; ++i)
+			buttons[i] = SDL_JoystickGetButton(sdlController, i);
+		if(buttons[0] && !lastButton)
+			failsafeMode = (FSMODE)(!failsafeMode);
+		lastButton = buttons[0];
 	}
 	else
 	{
-		std::cerr << "Controller not connected." << std::endl;
-		sdlController = SDL_GameControllerOpen(controllerIndex);
+		std::cerr << "[Controller] No controller detected!\n";
+		sdlController = SDL_JoystickOpen(controllerIndex);
 	}
-#endif
+
 }
 std::string Controller::CreatePayload()
 {
-	uint16_t controls[10] = {
+	uint16_t channel[10] = {
 		nPacketNumber & 0xFFFF,
-		mapRange(RX, -32768, 32767, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
-		mapRange(RY, -32768, 32767, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
-		mapRange(LY, -32768, 32767, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
-		mapRange(LX, -32768, 32767, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
-		mapRange(SA, 0, 1, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
-		mapRange(SB, 0, 1, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
-		mapRange(SC, 0, 2, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
-		mapRange(SD, 0, 1, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
-		mapRange(SE, 0, 1, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
+		mapRange(axis[0], -32768, 32767, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
+		mapRange(axis[1], -32768, 32767, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
+		mapRange(axis[2], -32768, 32767, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
+		mapRange(axis[3], -32768, 32767, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),
+		mapRange(axis[4], -32768, 32767, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),//ARM
+		mapRange(axis[5], -32768, 32767, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),//FM
+		mapRange(axis[7], -32768, 32767, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000),//FSMode - manual
+		mapRange(axis[6], -32768, 32767, 0, 1),//Remote
+		failsafeMode,//FSMode - disconnect
 	};
 	//("N(-?\\d+)RX(-?\\d+)RY(-?\\d+)LX(-?\\d+)LY(-?\\d+)SA(-?\\d+)SB(-?\\d+)SC(-?\\d+)SD(-?\\d+)SE(-?\\d+)CRC(-?\\d+)\\n");
-	uint8_t flags = 0;
-	flags = (remote << 0) | (fsMode << 1);
-	controls[9] += flags;
+	remote = channel[8];
 	std::string result = "N" + std::to_string(nPacketNumber) +
-		"RX" + std::to_string(controls[1]) +
-		"RY" + std::to_string(controls[2]) +
-		"LX" + std::to_string(controls[3]) +
-		"LY" + std::to_string(controls[4]) +
-		"SA" + std::to_string(controls[5]) +
-		"SB" + std::to_string(controls[6]) +
-		"SC" + std::to_string(controls[7]) +
-		"SD" + std::to_string(controls[8]) +
-		"SE" + std::to_string(controls[9]) +
-		"CRC" + std::to_string(CRC16(controls, 10)) + '\n';
-	//std::cout << result;
+		"RX" + std::to_string(channel[1]) +
+		"RY" + std::to_string(channel[2]) +
+		"LX" + std::to_string(channel[3]) +
+		"LY" + std::to_string(channel[4]) +
+		"SA" + std::to_string(channel[5]) +
+		"SB" + std::to_string(channel[6]) +
+		"SC" + std::to_string(channel[7]) +
+		"REM" + std::to_string(channel[8]) +
+		"FSM" + std::to_string(channel[9]) +
+		"CRC" + std::to_string(CRC16(channel, 10)) + '\n';
 	return result;
 }
 
 void Controller::Deadzone()
 {
-	if (LT < 10)
-		LT = 0;
-	if (RT < 10)
-		RT = 0;
-	if (-512 < LX && LX < 512)
-		LX = 0;
-	if (-512 < LY && LY < 512)
-		LY = 0;
-	if (-512 < RX && RX < 512)
-		RX = 0;
-	if (-512 < RY && RY < 512)
-		RY = 0;
 
-}
-void Controller::Print()
-{
-	printf("%8ld LX: %8d LT: %8d RT: %8d\n", nPacketNumber, LX, LT, RT);
 }
 
 std::wstring Controller::GetFlags()
 {
-	return std::wstring(SA ? L"ARMED\n" : L"DISARMED\n") + (fs ? L"FAILSAFE\n" : L"\n") + (fsMode ? L"LAND\n" : L"GPS\n") + (remote ? L"4G\n" : L"LOCAL\n");
+	return std::wstring(axis[4] ? L"ARMED\n" : L"DISARMED\n") + (axis[7]>=0 ? L"FAILSAFE\n" : L"\n") + (failsafeMode ? L"LAND\n" : L"GPS\n") + (remote ? L"4G\n" : L"LOCAL\n");
 }

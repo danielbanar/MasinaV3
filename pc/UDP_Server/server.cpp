@@ -29,14 +29,6 @@
 #include <codecvt>
 #define NO_CONTROLLER_
 
-
-
-#define HOSTNAME "your_ddns"
-double homeLat = 48.123456, homeLon = 17.123456;
-double pinLat = 48.456789 pinLon = 17.456789;
-
-
-
 std::wstring convert_to_wstring(const std::string& str) {
 	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 	return converter.from_bytes(str);
@@ -86,7 +78,13 @@ struct Telemetry
 Telemetry tel = { 0 };
 std::mutex sharedMutex;
 int serCells = 4; // 4S default
+//Domo
+double homeLat = 48.4145948, homeLon = 17.6957299;
 
+//Pole
+//double homeLat = 48.413256, homeLon = 17.692330;
+//Soporna
+double pinLat = 48.246096, pinLon = 17.817368;
 #ifndef NO_CONTROLLER
 Controller controller(0);
 #endif
@@ -197,7 +195,7 @@ void ProcessPayload(std::vector<uint8_t> payload)
 }
 
 
-std::wstring Compass(int angle) 
+std::wstring Compass(int angle)
 {
 	int scale = 10;
 	angle += 180 + std::round((double)scale / 2.0);
@@ -217,7 +215,7 @@ std::wstring Compass(int angle)
 	//std::wstring homeSymbol = L"🏠";
 	//wcsncpy(buffer + homeIndex, homeSymbol.c_str(), homeSymbol.size());
 	buffer[homeIndex] = L'H';
-	buffer[(int)(calculateAngle((double)tel.latitude / 10000000.0, (double)tel.longitude / 10000000.0, pinLat, pinLon) / scale)] = L'P';
+	buffer[(int)(calculateAngle((double)tel.latitude / 10000000.0, (double)tel.longitude / 10000000.0, pinLat, pinLon) / scale)] = L'J';
 	std::wstring s(buffer);
 
 	return s.substr(angle + 1) + s.substr(0, angle);
@@ -318,6 +316,7 @@ void InitD2D(HWND hwnd);
 void CleanupD2D();
 void RenderText(HWND hwnd);
 void Update(HWND hwnd, HWND targetWnd);
+int initializeSocket(int port, struct sockaddr_in& serverAddr);
 
 int main(int argc, char* argv[])
 {
@@ -342,93 +341,18 @@ int main(int argc, char* argv[])
 		return EXIT_FAILURE;
 	}
 
-	int serverSocket1, serverSocket2;
+	int serverAddrLen = sizeof(sockaddr_in);
 	struct sockaddr_in serverAddr1, serverAddr2;
-	int serverAddrLen = sizeof(serverAddr1);
 
-	const int serverPort1 = 2223;
-	const int serverPort2 = 2224;
-
-	if ((serverSocket1 = socket(AF_INET, SOCK_DGRAM, 0)) == INVALID_SOCKET)
-	{
-		std::cerr << "Socket creation error (port 2223): " << WSAGetLastError() << std::endl;
+	int serverSocket1 = initializeSocket(2223, serverAddr1);
+	if (serverSocket1 == INVALID_SOCKET) {
 		WSACleanup();
 		return EXIT_FAILURE;
 	}
 
-	if ((serverSocket2 = socket(AF_INET, SOCK_DGRAM, 0)) == INVALID_SOCKET)
-	{
-		std::cerr << "Socket creation error (port 2224): " << WSAGetLastError() << std::endl;
+	int serverSocket2 = initializeSocket(2224, serverAddr2);
+	if (serverSocket2 == INVALID_SOCKET) {
 		closesocket(serverSocket1);
-		WSACleanup();
-		return EXIT_FAILURE;
-	}
-
-	serverAddr1.sin_family = AF_INET;
-	serverAddr1.sin_addr.s_addr = INADDR_ANY;
-	serverAddr1.sin_port = htons(serverPort1);
-
-	serverAddr2.sin_family = AF_INET;
-	serverAddr2.sin_addr.s_addr = INADDR_ANY;
-	serverAddr2.sin_port = htons(serverPort2);
-
-	const int enable = 1;
-	if (setsockopt(serverSocket1, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(enable)) < 0)
-	{
-		std::cerr << "setsockopt(SO_REUSEADDR) failed (port 2223): " << WSAGetLastError() << std::endl;
-		closesocket(serverSocket1);
-		closesocket(serverSocket2);
-		WSACleanup();
-		return EXIT_FAILURE;
-	}
-
-	if (setsockopt(serverSocket2, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(enable)) < 0)
-	{
-		std::cerr << "setsockopt(SO_REUSEADDR) failed (port 2224): " << WSAGetLastError() << std::endl;
-		closesocket(serverSocket1);
-		closesocket(serverSocket2);
-		WSACleanup();
-		return EXIT_FAILURE;
-	}
-
-	if (bind(serverSocket1, (struct sockaddr*)&serverAddr1, sizeof(serverAddr1)) == SOCKET_ERROR)
-	{
-		std::cerr << "Binding failed (port 2223): " << WSAGetLastError() << std::endl;
-		closesocket(serverSocket1);
-		closesocket(serverSocket2);
-		WSACleanup();
-		return EXIT_FAILURE;
-	}
-
-	if (bind(serverSocket2, (struct sockaddr*)&serverAddr2, sizeof(serverAddr2)) == SOCKET_ERROR)
-	{
-		std::cerr << "Binding failed (port 2224): " << WSAGetLastError() << std::endl;
-		closesocket(serverSocket1);
-		closesocket(serverSocket2);
-		WSACleanup();
-		return EXIT_FAILURE;
-	}
-
-	std::cout << "Server listening on port " << serverPort1 << std::endl;
-	std::cout << "Server listening on port " << serverPort2 << std::endl;
-
-	struct sockaddr_in clientAddr;
-	int clientAddrLen = sizeof(clientAddr);
-	u_long mode = 1;
-	if (ioctlsocket(serverSocket1, FIONBIO, &mode) != NO_ERROR)
-	{
-		std::cerr << "ioctlsocket failed (port 2223): " << WSAGetLastError() << std::endl;
-		closesocket(serverSocket1);
-		closesocket(serverSocket2);
-		WSACleanup();
-		return EXIT_FAILURE;
-	}
-
-	if (ioctlsocket(serverSocket2, FIONBIO, &mode) != NO_ERROR)
-	{
-		std::cerr << "ioctlsocket failed (port 2224): " << WSAGetLastError() << std::endl;
-		closesocket(serverSocket1);
-		closesocket(serverSocket2);
 		WSACleanup();
 		return EXIT_FAILURE;
 	}
@@ -456,7 +380,7 @@ int main(int argc, char* argv[])
 	);
 
 	if (!hwnd) {
-		std::cerr << "Failed to create overlay window" << std::endl;
+		std::cerr << "[Overlay] Failed to create overlay window";
 		return 1;
 	}
 
@@ -468,7 +392,7 @@ int main(int argc, char* argv[])
 
 	HWND targetWnd = FindWindow(NULL, TARGET_WINDOW_NAME);
 	if (!targetWnd) {
-		std::cerr << "Target window not found!" << std::endl;
+		std::cerr << "[Overlay] Target window not found!\n";
 	}
 	std::thread traccarThread(TraccarUpdate);
 
@@ -479,8 +403,11 @@ int main(int argc, char* argv[])
 		controller.Poll();
 		controller.Deadzone();
 #endif
-
+		sockaddr_in clientAddr1;
+		sockaddr_in clientAddr2;
 		{
+			int clientAddrLen1 = sizeof(clientAddr1);
+
 #ifndef NO_CONTROLLER
 			std::string messageToSend = controller.CreatePayload();
 #else
@@ -488,7 +415,7 @@ int main(int argc, char* argv[])
 #endif
 
 			memset(rxbuffer1, 0, sizeof(rxbuffer1));
-			int bytesRead = recvfrom(serverSocket1, (char*)rxbuffer1, sizeof(rxbuffer1), 0, (struct sockaddr*)&clientAddr, &clientAddrLen);
+			int bytesRead = recvfrom(serverSocket1, (char*)rxbuffer1, sizeof(rxbuffer1), 0, (struct sockaddr*)&clientAddr1, &clientAddrLen1);
 			if (bytesRead == SOCKET_ERROR)
 			{
 				int err = WSAGetLastError();
@@ -501,11 +428,12 @@ int main(int argc, char* argv[])
 			}
 			else
 			{
-				//std::cout << "Received message from client: " << rxbuffer1;
+				clientAddr2.sin_addr = clientAddr1.sin_addr;
 				buffer.insert(buffer.end(), &rxbuffer1[0], &rxbuffer1[bytesRead]);
 				CheckPayloads(buffer);
 			}
-			if (sendto(serverSocket1, messageToSend.c_str(), messageToSend.length(), 0, (struct sockaddr*)&clientAddr, clientAddrLen) == SOCKET_ERROR)
+			std::cout << messageToSend;
+			if (sendto(serverSocket1, messageToSend.c_str(), messageToSend.length(), 0, (struct sockaddr*)&clientAddr1, clientAddrLen1) == SOCKET_ERROR)
 			{
 				int err = WSAGetLastError();
 				LPSTR errorMessage = nullptr;
@@ -513,9 +441,13 @@ int main(int argc, char* argv[])
 				std::cerr << "Error sending data to client: " << errorMessage;
 			}
 		}
+
 		{
+			
+			int clientAddrLen2 = sizeof(clientAddr2);
+
 			memset(rxbuffer2, 0, sizeof(rxbuffer2));
-			int bytesRead = recvfrom(serverSocket2, (char*)rxbuffer2, sizeof(rxbuffer2), 0, (struct sockaddr*)&clientAddr, &clientAddrLen);
+			int bytesRead = recvfrom(serverSocket2, (char*)rxbuffer2, sizeof(rxbuffer2), 0, (struct sockaddr*)&clientAddr2, &clientAddrLen2);
 			if (bytesRead == SOCKET_ERROR)
 			{
 				int err = WSAGetLastError();
@@ -529,20 +461,25 @@ int main(int argc, char* argv[])
 			else
 			{
 				std::cout << "Client: " << rxbuffer2;
+				clientAddr1.sin_addr = clientAddr2.sin_addr;
 			}
+
 			std::string messageToSend = "PI\n";
-			/*if (sendto(serverSocket2, messageToSend.c_str(), messageToSend.length(), 0, (struct sockaddr*)&clientAddr, clientAddrLen) == SOCKET_ERROR)
+			/*
+			if (sendto(serverSocket2, messageToSend.c_str(), messageToSend.length(), 0, (struct sockaddr*)&clientAddr2, clientAddrLen2) == SOCKET_ERROR)
 			{
 				int err = WSAGetLastError();
 				LPSTR errorMessage = nullptr;
 				FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&errorMessage, 0, NULL);
 				std::cerr << "Error sending data to client: " << errorMessage;
-			}*/
+			}
+			*/
 		}
+
 
 		Update(hwnd, targetWnd);
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
-}
+	}
 	traccarThread.join();
 	CleanupD2D();
 	closesocket(serverSocket1);
@@ -595,7 +532,7 @@ void Update(HWND hwnd, HWND targetWnd)
 
 	if (!targetWnd)
 	{
-		std::cerr << "Target window not found!" << std::endl;
+		std::cerr << "[Overlay] Target window not found!" << std::endl;
 		targetWnd = FindWindow(NULL, TARGET_WINDOW_NAME);
 		ShowWindow(hwnd, SW_HIDE);
 	}
@@ -688,7 +625,7 @@ void RenderText(HWND hwnd) {
 	int distanceToHome = calculateHaversine((double)tel.latitude / 10000000.0, (double)tel.longitude / 10000000.0, homeLat, homeLon);
 	swprintf(leftBuffer, 512, L"🌡️%4d °C\n↓%4d KB/s\n↑%4d KB/s\n\n\n%4.1fV 🔋 %4.2fV\n%4.1fA  %4dmAh\n\nRSSI %4d\nSNR %5d",
 		tel.pi_temp, tel.pi_read_speed, tel.pi_write_speed, ((float)tel.voltage) / 10, ((float)tel.voltage) / (10 * serCells), ((float)tel.current) / 10, tel.capacity, tel.pi_rssi, tel.pi_snr);
-	swprintf(centerBuffer, 512, L"%s\n%s\n|\n\n\n\n%s\n\n\n\n\n\n\n\n\n%s", convert_to_wstring(tel.flightMode).c_str(), Compass(tel.heading / 100).c_str(), bottomText.c_str(),controller.GetFlags().c_str());
+	swprintf(centerBuffer, 512, L"%s\n%s\n|\n\n\n\n%s\n\n\n\n\n\n\n\n\n%s", convert_to_wstring(tel.flightMode).c_str(), Compass(tel.heading / 100).c_str(), bottomText.c_str(), controller.GetFlags().c_str());
 	swprintf(rightBuffer, 512, L"%s\n\nLat%10.6f\nLon%10.6f\n↕️%4dm 🧭%3d°\n🛰️%4d­­\n⏱%4d km/h\n%3.1f km/h/A\n🏠%5dm\n\n\nP %5.1f°\nR %5.1f°\nY %5.1f°", convert_to_wstring(ctime(&currentTime)).c_str(), ((float)tel.latitude) / 10000000.f, ((float)tel.longitude) / 10000000.f, tel.altitude, tel.heading / 100, tel.satellites, tel.groundspeed / 10, (tel.groundspeed / 10) / (((float)tel.current) / 10), distanceToHome, RADTODEG(tel.pitch) / 10000.f, RADTODEG(tel.roll) / 10000.f, RADTODEG(tel.yaw) / 10000.f);
 
 
@@ -863,8 +800,46 @@ void TraccarUpdate()
 			std::lock_guard<std::mutex> lock(sharedMutex);
 			snprintf(requestPath, sizeof(requestPath), "/?id=123456789&timestamp=%d&lat=%f&lon=%f&speed=%d&altitude=%d", (int)time(NULL), ((double)tel.latitude) / 10000000.0, ((double)tel.longitude) / 10000000.0, tel.groundspeed / 10, tel.altitude);
 		}
-		if (Http_Post(HOSTNAME, 8082, requestPath, NULL, 0, buffer, sizeof(buffer)) < 0)
+		if (Http_Post("tutos.ddns.net", 8082, requestPath, NULL, 0, buffer, sizeof(buffer)) < 0)
 			fprintf(stderr, "send location to traccar fail\n");
 		std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	}
+}
+
+int initializeSocket(int port, struct sockaddr_in& serverAddr) {
+	int serverSocket;
+
+	// Create a socket
+	if ((serverSocket = socket(AF_INET, SOCK_DGRAM, 0)) == INVALID_SOCKET) {
+		std::cerr << "Socket creation error (port " << port << "): " << WSAGetLastError() << std::endl;
+		return INVALID_SOCKET;
+	}
+
+	// Set up the sockaddr_in structure
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_addr.s_addr = INADDR_ANY;
+	serverAddr.sin_port = htons(port);
+
+	const int enable = 1;
+	if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable, sizeof(enable)) < 0) {
+		std::cerr << "setsockopt(SO_REUSEADDR) failed (port " << port << "): " << WSAGetLastError() << std::endl;
+		closesocket(serverSocket);
+		return INVALID_SOCKET;
+	}
+
+	if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+		std::cerr << "Binding failed (port " << port << "): " << WSAGetLastError() << std::endl;
+		closesocket(serverSocket);
+		return INVALID_SOCKET;
+	}
+
+	u_long mode = 1; // Non-blocking mode
+	if (ioctlsocket(serverSocket, FIONBIO, &mode) != NO_ERROR) {
+		std::cerr << "ioctlsocket failed (port " << port << "): " << WSAGetLastError() << std::endl;
+		closesocket(serverSocket);
+		return INVALID_SOCKET;
+	}
+
+	std::cout << "Server listening on port " << port << std::endl;
+	return serverSocket; // Return the valid socket descriptor
 }

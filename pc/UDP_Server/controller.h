@@ -2,12 +2,16 @@
 #include <iostream>
 #include <string>
 #ifdef _WIN32
-#include <windows.h>
-#include <XInput.h>
-#pragma comment(lib, "XInput.lib")
+#include <SDL.h>
 #else
 #include <SDL2/SDL.h>
 #endif
+
+enum FSMODE : uint8_t
+{
+	GPS,
+	LAND
+};
 class Controller
 {
 public:
@@ -19,26 +23,12 @@ public:
 	std::string CreatePayload();
 	std::wstring GetFlags();
 private:
-#ifdef _WIN32
-	XINPUT_STATE state;
-#else
-	SDL_GameController* sdlController;
-#endif
+	SDL_Joystick* sdlController;
 	int controllerIndex;
 	unsigned long nPacketNumber;
-	unsigned short Buttons;
-	short LT;
-	short RT;
-	short LX;
-	short LY;
-	short RX;
-	short RY;
-	bool SA = true;
-	bool SB = false;
-	uint8_t SC = 0;
-	bool SD = false;
-	bool SE = false;
+	int16_t axis[8] = {0};
+	uint8_t buttons[24] = {0};
 	bool remote = false;
-	bool fsMode = false;
-	bool fs = false;
+	FSMODE failsafeMode = GPS;
+	bool failsafe = false;
 };

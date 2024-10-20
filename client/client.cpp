@@ -30,9 +30,7 @@
 #define BUFFER_SIZE 128
 #define RADTODEG(radians) ((radians) * (180.0 / M_PI))
 
-
-
-#define HOSTNAME "your_ddns"
+#define HOSTNAME "tutos.ddns.net"
 #define LOCAL_TIMEOUT 300000
 #define FAILSAFE_TIMEOUT 5000
 #define STABILIZE_TIMEOUT 250
@@ -89,7 +87,40 @@ uint8_t CRC(const uint8_t* data, size_t start, size_t length)
 
 	return crc;
 }
+int initializeSocket(int port, struct sockaddr_in& serverAddr) {
+    int sockfd;
+    struct addrinfo hints, *res;
 
+    // Creating socket file descriptor
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    memset(&hints, 0, sizeof(hints));
+
+    hints.ai_family = AF_INET;       // IPv4
+    hints.ai_socktype = SOCK_DGRAM;  // UDP
+
+    // Resolve the hostname to an IP address
+    if (getaddrinfo(HOSTNAME, NULL, &hints, &res) != 0) {
+        perror("getaddrinfo failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Copy the resolved address to serverAddr
+    serverAddr = *(struct sockaddr_in*)(res->ai_addr);
+    serverAddr.sin_port = htons(port);
+
+    freeaddrinfo(res);
+
+    // Set socket to non-blocking
+    int flags = fcntl(sockfd, F_GETFL, 0);
+    fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+
+    return sockfd;
+}
 void SetupModemTelemetry()
 {
 	modemIndex = getModemIndex();
@@ -129,37 +160,8 @@ void receiveMessages(int sockfd, struct sockaddr_in& serverAddr)
 }
 void PiTelemetry()
 {
-	int sockfd;
 	struct sockaddr_in serverAddr;
-	struct addrinfo hints, * res;
-
-	// Creating socket file descriptor
-	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-	{
-		perror("Socket creation failed");
-		exit(EXIT_FAILURE);
-	}
-
-	memset(&serverAddr, 0, sizeof(serverAddr));
-	memset(&hints, 0, sizeof(hints));
-
-	hints.ai_family = AF_INET;		// IPv4
-	hints.ai_socktype = SOCK_DGRAM; // UDP
-
-	// Resolve the hostname to an IP address
-	if (getaddrinfo(HOSTNAME, NULL, &hints, &res) != 0)
-	{
-		perror("getaddrinfo failed");
-		exit(EXIT_FAILURE);
-	}
-
-	// Copy the resolved address to serverAddr
-	serverAddr = *(struct sockaddr_in*)(res->ai_addr);
-	serverAddr.sin_port = htons(2224);
-
-	freeaddrinfo(res);
-	int flags = fcntl(sockfd, F_GETFL, 0);
-	fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+    int sockfd = initializeSocket(2224, serverAddr);
 
 	SetupModemTelemetry();
 
@@ -183,7 +185,7 @@ void PiTelemetry()
 			SetupModemTelemetry();
 		std::string telemetryString = "Temp: " + std::to_string(get_cpu_temperature()) + " C, R: " + std::to_string(rx_kbps) + " KB/s, T: " + std::to_string(tx_kbps) + " KB/s, RSSI: " + std::to_string(modemStats.rssi) + ", SNR: " + std::to_string(modemStats.snr) + "\n\0";
 
-		sendto(sockfd, telemetryString.c_str(), telemetryString.length(), MSG_CONFIRM, (const struct sockaddr*)&serverAddr, sizeof(serverAddr));
+		sendto(sockfd, telemetryString.c_str(), telemetryString.length(), 0, (const struct sockaddr*)&serverAddr, sizeof(serverAddr));
 	}
 
 	receiveThread.join();
@@ -218,7 +220,6 @@ int main()
 	if (ioctl(serialPort, TCSETS2, &tio) != 0)
 		printf("serial error");
 
-
 	// Set the serial port to non-blocking mode
 	int flags = fcntl(serialPort, F_GETFL, 0);
 	if (flags == -1) {
@@ -234,28 +235,10 @@ int main()
 		return 1;
 	}
 
-	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (sockfd == -1)
-	{
-		perror("Socket creation failed");
-		exit(EXIT_FAILURE);
-	}
-
-	sockaddr_in serverAddr{};
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_port = htons(2223);
-	struct addrinfo* result;
-	if (getaddrinfo(HOSTNAME, nullptr, nullptr, &result) != 0)
-	{
-		perror("Failed to resolve domain");
-		exit(EXIT_FAILURE);
-	}
-	memcpy(&serverAddr.sin_addr, &((struct sockaddr_in*)result->ai_addr)->sin_addr, sizeof(struct in_addr));
-	freeaddrinfo(result);
-
-	// Set non-blocking
-	fcntl(sockfd, F_SETFL, O_NONBLOCK);
-
+	struct sockaddr_in serverAddr;
+    int sockfd = initializeSocket(2223, serverAddr);
+	uint8_t dummybuf[5] = "INIT";
+	sendto(sockfd, dummybuf, 5, 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
 	while (true)
 	{
 		static uint16_t channels[16] = { 992, 992, 1716, 992, 191, 191, 191, 191, 997, 997, 997, 997,   0,   0,1811, 1811 };
@@ -300,16 +283,19 @@ int main()
 					if (elapsedTimeValid >= LOCAL_TIMEOUT)
 					{
 						//No data for 5m - Switch to local controller
+						std::cerr << "LOCAL_TIMEOUT\n";
 						bcm2835_gpio_write(21, LOW);
 					}
 					else if (elapsedTimeValid >= FAILSAFE_TIMEOUT)
 					{
 						//No data for 5s - Failsafe
+						std::cerr << "FAILSAFE_TIMEOUT\n";
 						channels[6] = fsMode ? CRSF_CHANNEL_VALUE_2000 : CRSF_CHANNEL_VALUE_MID;
 					}
 					else if (elapsedTimeValid >= STABILIZE_TIMEOUT)
 					{
 						//No data for 250ms - STABILIZE
+						std::cerr << "STABILIZE_TIMEOUT\n";
 						channels[0] = CRSF_CHANNEL_VALUE_MID;//ROLL
 						channels[1] = CRSF_CHANNEL_VALUE_MID;//PITCH
 						channels[2] = CRSF_CHANNEL_VALUE_MID;//YAW
@@ -368,7 +354,7 @@ int main()
 			else if (bytesRead > 0)
 			{
 				rxBuffer[bytesRead] = '\0';
-				static std::regex regexPattern("N(-?\\d+)RX(-?\\d+)RY(-?\\d+)LX(-?\\d+)LY(-?\\d+)SA(-?\\d+)SB(-?\\d+)SC(-?\\d+)SD(-?\\d+)SE(-?\\d+)CRC(-?\\d+)\\n");
+				static std::regex regexPattern("N(-?\\d+)RX(-?\\d+)RY(-?\\d+)LX(-?\\d+)LY(-?\\d+)SA(-?\\d+)SB(-?\\d+)SC(-?\\d+)REM(-?\\d+)FSM(-?\\d+)CRC(-?\\d+)\\n");
 				std::cmatch matches;
 				if (std::regex_search(rxBuffer, matches, regexPattern))
 				{
@@ -378,7 +364,7 @@ int main()
 						controls[i] = std::stol(matches[i + 1]) & 0xFFFF;
 					uint16_t crc_recv = std::stoi(matches[11]);
 					uint16_t crc_calc = CRC16(controls, 10);
-					//printf("CRC: recv=%d calc=%d", crc_recv, crc_calc);
+					//printf("CRC: recv=%d calc=%d\n", crc_recv, crc_calc);
 					if (crc_recv != crc_calc)
 					{
 						continue;
@@ -389,11 +375,13 @@ int main()
 					{
 						lastN = N;
 						lastValidPayload = std::chrono::high_resolution_clock::now();
-						memcpy(channels, controls + 1, 9 * sizeof(uint16_t));
-						uint16_t flags = std::stoi(matches[10])-191;
-						bool remote = flags & 0b01;
-						fsMode = flags & 0b10;
+						memcpy(channels, controls + 1, 8 * sizeof(uint16_t));
+						bool remote = std::stoi(matches[9]) & 1;
+						fsMode = std::stoi(matches[10]) & 1;
 						bcm2835_gpio_write(21, remote);
+						/*for(int i = 0;i<10;i++)
+							printf("%d ",controls[i]);
+						printf("\n");*/
 					}
 					else
 					{
