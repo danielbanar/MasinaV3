@@ -78,13 +78,11 @@ struct Telemetry
 Telemetry tel = { 0 };
 std::mutex sharedMutex;
 int serCells = 4; // 4S default
-//Domo
-double homeLat = 48.4145948, homeLon = 17.6957299;
 
-//Pole
-//double homeLat = 48.413256, homeLon = 17.692330;
-//Soporna
-double pinLat = 48.246096, pinLon = 17.817368;
+double homeLat = 48.000000, homeLon = 17.000000;
+
+
+double pinLat = 48.999999, pinLon = 17.999999;
 #ifndef NO_CONTROLLER
 Controller controller(0);
 #endif
@@ -800,7 +798,7 @@ void TraccarUpdate()
 			std::lock_guard<std::mutex> lock(sharedMutex);
 			snprintf(requestPath, sizeof(requestPath), "/?id=123456789&timestamp=%d&lat=%f&lon=%f&speed=%d&altitude=%d", (int)time(NULL), ((double)tel.latitude) / 10000000.0, ((double)tel.longitude) / 10000000.0, tel.groundspeed / 10, tel.altitude);
 		}
-		if (Http_Post("tutos.ddns.net", 8082, requestPath, NULL, 0, buffer, sizeof(buffer)) < 0)
+		if (Http_Post("your_ddns", 8082, requestPath, NULL, 0, buffer, sizeof(buffer)) < 0)
 			fprintf(stderr, "send location to traccar fail\n");
 		std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	}
