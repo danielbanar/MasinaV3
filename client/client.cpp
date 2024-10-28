@@ -30,7 +30,7 @@
 #define BUFFER_SIZE 128
 #define RADTODEG(radians) ((radians) * (180.0 / M_PI))
 
-#define HOSTNAME "tutos.ddns.net"
+#define HOSTNAME "your_ddns"
 #define LOCAL_TIMEOUT 300000
 #define FAILSAFE_TIMEOUT 5000
 #define STABILIZE_TIMEOUT 250
