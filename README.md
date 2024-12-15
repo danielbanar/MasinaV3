@@ -319,6 +319,8 @@ Enter the folder: `cd MasinaV3/client`
 Edit the DDNS to yours: `sudo nano client.cpp` by changing the string on this line `#define HOSTNAME "your_ddns"`
 
 Compile it by running: `make`
+Move it to home folder: `cd` and then
+`cp MasinaV3/client client -r`
 
 Create a new service: `sudo nano /etc/systemd/system/client.service`
 ```
