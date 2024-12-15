@@ -315,7 +315,7 @@ Enable the service: `sudo systemctl enable cam_stream.service`
 ### Controls and telemetry (Pi)
 Download the source: `git clone https://github.com/danielbanar/MasinaV3.git`
 
-Enter the folder: `cd client`
+Enter the folder: `cd MasinaV3/client`
 Edit the DDNS to yours: `sudo nano client.cpp` by changing the string on this line `#define HOSTNAME "your_ddns"`
 
 Compile it by running: `make`
