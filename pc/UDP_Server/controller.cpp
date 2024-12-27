@@ -108,5 +108,5 @@ void Controller::Deadzone()
 
 std::wstring Controller::GetFlags()
 {
-	return std::wstring(axis[4]>0 ? L"ARMED\n" : L"DISARMED\n") + (axis[7]>=0 ? L"FAILSAFE\n" : L"\n") + (failsafeMode ? L"LAND\n" : L"GPS\n") + (remote ? L"4G\n" : L"LOCAL\n");
+	return std::wstring(axis[4]>0 ? L"ARMED\n" : L"DISARMED\n") + std::to_wstring(mapRange(axis[2], -32768, 32767, 1000, 2000))+ L"\n" + (axis[7] >= 0 ? L"FAILSAFE\n" : L"\n") + (failsafeMode ? L"LAND\n" : L"GPS\n") + (remote ? L"4G\n" : L"LOCAL\n");
 }
