@@ -1,0 +1,3 @@
+auto wwan0
+iface wwan0 inet manual
+    post-up sh /usr/bin/setup_wwan.sh

@@ -1,20 +1,28 @@
-CXX = g++
-CXXFLAGS = -Wall -Wextra -std=c++11
-LIBS = -lpthread -lbcm2835
+# Define compiler and flags
+CXX = arm-linux-gnueabihf-g++
+CXXFLAGS = -march=armv7-a -mfpu=neon -mfloat-abi=hard -O2 -flto -fdata-sections -ffunction-sections -mtune=cortex-a9
+PTHREAD = -pthread
 
-SRCS = $(wildcard *.cpp)
-OBJS = $(SRCS:.cpp=.o)
-TARGET = client
+# Targets
+TARGETS = masinaclient masinawebserver
 
-.PHONY: all clean
+# Default target: build both client and masinawebserver
+all: $(TARGETS)
 
-all: $(TARGET)
+# Build the client executable
+masinaclient: client.cpp utils.cpp
+	$(CXX) $(CXXFLAGS) client.cpp utils.cpp -o masinaclient $(PTHREAD) -Wl,--gc-sections
 
-$(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+# Build the masinawebserver executable
+masinawebserver: masinawebserver.cpp
+	$(CXX) $(CXXFLAGS) masinawebserver.cpp -o masinawebserver -Wl,--gc-sections
 
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
+# Clean target: removes object files and executables
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(TARGETS)
+
+# Strip executable to remove debugging symbols (if you want to further reduce size)
+strip: $(TARGETS)
+	strip masinaclient masinawebserver
+
+.PHONY: all clean strip

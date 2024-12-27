@@ -21,7 +21,6 @@
 #include "/usr/include/asm-generic/ioctls.h"
 #include <errno.h>
 #include <cmath>
-#include <bcm2835.h>
 #define CRSF_CHANNEL_VALUE_MIN  172
 #define CRSF_CHANNEL_VALUE_1000 191
 #define CRSF_CHANNEL_VALUE_MID  992
@@ -30,10 +29,10 @@
 #define BUFFER_SIZE 128
 #define RADTODEG(radians) ((radians) * (180.0 / M_PI))
 
-#define HOSTNAME "your_ddns"
-#define LOCAL_TIMEOUT 300000
-#define FAILSAFE_TIMEOUT 5000
-#define STABILIZE_TIMEOUT 250
+int LOCAL_TIMEOUT = 300000;
+int FAILSAFE_TIMEOUT = 5000;
+int STABILIZE_TIMEOUT = 250;
+std::string hostname;
 
 int get_cpu_temperature();
 struct NetworkUsage
@@ -41,15 +40,8 @@ struct NetworkUsage
 	unsigned long rx_bytes;
 	unsigned long tx_bytes;
 };
-struct ModemStats
-{
-	int16_t rssi, rsrq, rsrp;
-	int8_t snr;
-};
-int modemIndex = 0;
 NetworkUsage getNetworkUsage();
-int getModemIndex();
-ModemStats getModemStats(int modemIndex);
+void getSignalStrength(int& rssi, int& snr);
 int16_t CRC16(uint16_t* data, size_t length) {
 	uint16_t crc = 0x0000; // Initial value
 	uint16_t polynomial = 0x1021; // Polynomial for CRC-16-CCITT
@@ -87,58 +79,73 @@ uint8_t CRC(const uint8_t* data, size_t start, size_t length)
 
 	return crc;
 }
-int initializeSocket(int port, struct sockaddr_in& serverAddr) {
-    int sockfd;
-    struct addrinfo hints, *res;
 
-    // Creating socket file descriptor
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
-
-    memset(&serverAddr, 0, sizeof(serverAddr));
-    memset(&hints, 0, sizeof(hints));
-
-    hints.ai_family = AF_INET;       // IPv4
-    hints.ai_socktype = SOCK_DGRAM;  // UDP
-
-    // Resolve the hostname to an IP address
-    if (getaddrinfo(HOSTNAME, NULL, &hints, &res) != 0) {
-        perror("getaddrinfo failed");
-        exit(EXIT_FAILURE);
-    }
-
-    // Copy the resolved address to serverAddr
-    serverAddr = *(struct sockaddr_in*)(res->ai_addr);
-    serverAddr.sin_port = htons(port);
-
-    freeaddrinfo(res);
-
-    // Set socket to non-blocking
-    int flags = fcntl(sockfd, F_GETFL, 0);
-    fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
-
-    return sockfd;
-}
-void SetupModemTelemetry()
-{
-	modemIndex = getModemIndex();
-	// Run mmcli -m <modemIndex> --signal-setup=1
-	std::string setupCommand = "mmcli -m " + std::to_string(modemIndex) + " --signal-setup=1";
-	if (modemIndex == -1)
-	{
-		std::cout << "Modem not detected hope you are on wifi" << std::endl;
+bool readConfig(const std::string& filename) {
+	std::ifstream file(filename);
+	if (!file.is_open()) {
+		std::cerr << "Error: Could not open configuration file " << filename << std::endl;
+		return false;
 	}
-	else
-	{
-		int setupResult = std::system(setupCommand.c_str());
-		if (setupResult != 0)
-		{
-			std::cerr << "Error running signal-setup command." << std::endl;
+
+	std::string line;
+	while (std::getline(file, line)) {
+		std::istringstream iss(line);
+		std::string key, value;
+		if (std::getline(iss, key, '=') && std::getline(iss, value)) {
+			if (key == "host")
+				hostname = value;
+			else if (key == "LOCAL_TIMEOUT")
+				LOCAL_TIMEOUT = std::stoi(value);
+			else if (key == "FAILSAFE_TIMEOUT")
+				FAILSAFE_TIMEOUT = std::stoi(value);
+			else if (key == "STABILIZE_TIMEOUT")
+				STABILIZE_TIMEOUT = std::stoi(value);
 		}
 	}
+	return true;
 }
+
+int initializeSocket(const std::string& address, int port, struct sockaddr_in& serverAddr) {
+	int sockfd;
+	struct addrinfo hints, * res;
+
+	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+		perror("Socket creation failed");
+		exit(EXIT_FAILURE);
+	}
+
+	memset(&serverAddr, 0, sizeof(serverAddr));
+	memset(&hints, 0, sizeof(hints));
+
+	hints.ai_family = AF_INET;       // IPv4
+	hints.ai_socktype = SOCK_DGRAM;  // UDP
+
+	// Check if the input is an IP address
+	if (inet_pton(AF_INET, address.c_str(), &serverAddr.sin_addr) == 1) {
+		// It's an IP address
+		serverAddr.sin_family = AF_INET;
+	}
+	else {
+		// It's a hostname, resolve it
+		if (getaddrinfo(address.c_str(), NULL, &hints, &res) != 0) {
+			perror("getaddrinfo failed");
+			exit(EXIT_FAILURE);
+		}
+
+		// Copy the resolved address to serverAddr
+		serverAddr = *(struct sockaddr_in*)(res->ai_addr);
+		freeaddrinfo(res);
+	}
+
+	serverAddr.sin_port = htons(port);
+
+	// Set socket to non-blocking
+	int flags = fcntl(sockfd, F_GETFL, 0);
+	fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+
+	return sockfd;
+}
+
 void receiveMessages(int sockfd, struct sockaddr_in& serverAddr)
 {
 	char buffer[BUFFER_SIZE];
@@ -146,6 +153,7 @@ void receiveMessages(int sockfd, struct sockaddr_in& serverAddr)
 
 	while (true)
 	{
+		usleep(1000);
 		int len = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&serverAddr, &addrLen);
 		if (len == -1)
 		{
@@ -161,11 +169,8 @@ void receiveMessages(int sockfd, struct sockaddr_in& serverAddr)
 void PiTelemetry()
 {
 	struct sockaddr_in serverAddr;
-    int sockfd = initializeSocket(2224, serverAddr);
+	int sockfd = initializeSocket(hostname, 2224, serverAddr);
 
-	SetupModemTelemetry();
-
-	// Start a thread to receive messages from the server
 	std::thread receiveThread(receiveMessages, sockfd, std::ref(serverAddr));
 
 	while (true)
@@ -179,11 +184,10 @@ void PiTelemetry()
 		unsigned long tx_diff = usage2.tx_bytes - usage1.tx_bytes;
 		unsigned long rx_kbps = static_cast<unsigned long>(rx_diff / bytes_to_kb / interval);
 		unsigned long tx_kbps = static_cast<unsigned long>(tx_diff / bytes_to_kb / interval);
-
-		ModemStats modemStats = getModemStats(modemIndex);
-		if (!modemStats.rssi && !modemStats.snr)
-			SetupModemTelemetry();
-		std::string telemetryString = "Temp: " + std::to_string(get_cpu_temperature()) + " C, R: " + std::to_string(rx_kbps) + " KB/s, T: " + std::to_string(tx_kbps) + " KB/s, RSSI: " + std::to_string(modemStats.rssi) + ", SNR: " + std::to_string(modemStats.snr) + "\n\0";
+		int rssi = 0;
+		int snr = 0;
+		getSignalStrength(rssi, snr);
+		std::string telemetryString = "Temp: " + std::to_string(get_cpu_temperature()) + " C, R: " + std::to_string(rx_kbps) + " KB/s, T: " + std::to_string(tx_kbps) + " KB/s, RSSI: " + std::to_string(rssi) + ", SNR: " + std::to_string(snr) + "\n\0";
 
 		sendto(sockfd, telemetryString.c_str(), telemetryString.length(), 0, (const struct sockaddr*)&serverAddr, sizeof(serverAddr));
 	}
@@ -193,14 +197,18 @@ void PiTelemetry()
 }
 int main()
 {
-	std::thread PiTelemetryThread(PiTelemetry);
-
-	if (!bcm2835_init()) {
-		std::cerr << "BCM2835 library initialization failed!" << std::endl;
+	if (!readConfig("/root/config.txt")) {
 		return 1;
 	}
-	bcm2835_gpio_fsel(21, BCM2835_GPIO_FSEL_OUTP);
-	int serialPort = open("/dev/ttyS0", O_RDWR);
+
+	std::cout << "Using hostname: " << hostname << std::endl;
+	std::cout << "LOCAL_TIMEOUT: " << LOCAL_TIMEOUT << std::endl;
+	std::cout << "FAILSAFE_TIMEOUT: " << FAILSAFE_TIMEOUT << std::endl;
+	std::cout << "STABILIZE_TIMEOUT: " << STABILIZE_TIMEOUT << std::endl;
+
+	std::thread PiTelemetryThread(PiTelemetry);
+
+	int serialPort = open("/dev/ttyS2", O_RDWR);
 	int baudrate = 420000;
 	struct termios2 tio;
 	ioctl(serialPort, TCGETS2, &tio);
@@ -236,11 +244,13 @@ int main()
 	}
 
 	struct sockaddr_in serverAddr;
-    int sockfd = initializeSocket(2223, serverAddr);
+	int sockfd = initializeSocket(hostname, 2223, serverAddr);
 	uint8_t dummybuf[5] = "INIT";
 	sendto(sockfd, dummybuf, 5, 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+	std::cout << "INIT SENT";
 	while (true)
 	{
+		usleep(1000);
 		static uint16_t channels[16] = { 992, 992, 1716, 992, 191, 191, 191, 191, 997, 997, 997, 997,   0,   0,1811, 1811 };
 		static bool fsMode = false;
 		static auto lastValidPayload = std::chrono::high_resolution_clock::now();
@@ -253,11 +263,11 @@ int main()
 			{
 				if (errno == EAGAIN || errno == EWOULDBLOCK)
 				{
-
 				}
 				else
 				{
 					perror("Failed to read from serial port");
+					usleep(100000);
 				}
 			}
 			else if (serialReadBytes == 0)
@@ -275,7 +285,6 @@ int main()
 			ssize_t bytesRead = recvfrom(sockfd, rxBuffer, sizeof(rxBuffer), 0, (struct sockaddr*)&clientAddr, &addrLen);
 			if (bytesRead == -1)
 			{
-				// Check if the error is EWOULDBLOCK or EAGAIN
 				if (errno == EWOULDBLOCK || errno == EAGAIN)
 				{
 					auto currentTime = std::chrono::high_resolution_clock::now();
@@ -284,18 +293,18 @@ int main()
 					{
 						//No data for 5m - Switch to local controller
 						std::cerr << "LOCAL_TIMEOUT\n";
-						bcm2835_gpio_write(21, LOW);
+						std::system("gpio clear 10");
 					}
 					else if (elapsedTimeValid >= FAILSAFE_TIMEOUT)
 					{
 						//No data for 5s - Failsafe
-						std::cerr << "FAILSAFE_TIMEOUT\n";
+						//std::cerr << "FAILSAFE_TIMEOUT\n";
 						channels[6] = fsMode ? CRSF_CHANNEL_VALUE_2000 : CRSF_CHANNEL_VALUE_MID;
 					}
 					else if (elapsedTimeValid >= STABILIZE_TIMEOUT)
 					{
 						//No data for 250ms - STABILIZE
-						std::cerr << "STABILIZE_TIMEOUT\n";
+						//std::cerr << "STABILIZE_TIMEOUT\n";
 						channels[0] = CRSF_CHANNEL_VALUE_MID;//ROLL
 						channels[1] = CRSF_CHANNEL_VALUE_MID;//PITCH
 						channels[2] = CRSF_CHANNEL_VALUE_MID;//YAW
@@ -378,7 +387,12 @@ int main()
 						memcpy(channels, controls + 1, 8 * sizeof(uint16_t));
 						bool remote = std::stoi(matches[9]) & 1;
 						fsMode = std::stoi(matches[10]) & 1;
-						bcm2835_gpio_write(21, remote);
+						static bool lastRemoteState = false;
+						if (remote != lastRemoteState) {
+							remote ? std::system("gpio set 10") : std::system("gpio clear 10");
+							lastRemoteState = remote;
+						}
+						
 						/*for(int i = 0;i<10;i++)
 							printf("%d ",controls[i]);
 						printf("\n");*/
@@ -401,12 +415,11 @@ int main()
 		catch (const std::exception& e)
 		{
 			std::cerr << "Exception: " << e.what() << std::endl;
-			usleep(1000); // Sleep for 1 second on exception
+			usleep(10000); // Sleep for 1 second on exception
 		}
 	}
 	close(sockfd);
 	close(serialPort);
-	bcm2835_close();
 	PiTelemetryThread.join();
 	return 0;
 }

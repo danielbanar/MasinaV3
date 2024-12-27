@@ -11,11 +11,6 @@ struct NetworkUsage
     unsigned long rx_bytes;
     unsigned long tx_bytes;
 };
-struct ModemStats
-{
-    int16_t rssi, rsrq, rsrp;
-    int8_t snr;
-};
 NetworkUsage getNetworkUsage()
 {
     std::ifstream netDevFile("/proc/net/dev");
@@ -55,100 +50,80 @@ NetworkUsage getNetworkUsage()
 // Function to read CPU temperature from sysfs
 int get_cpu_temperature()
 {
-    std::ifstream file("/sys/class/thermal/thermal_zone0/temp");
+    std::ifstream file("/sys/devices/virtual/mstar/msys/TEMP_R");
     if (!file.is_open())
     {
         std::cerr << "Error: Unable to open temperature file." << std::endl;
         return -1;
     }
 
-    std::string temp_str;
-    std::getline(file, temp_str);
+    std::string line;
+    std::getline(file, line);
     file.close();
 
-    float temp = std::stof(temp_str) / 1000.0; // Convert to Celsius
-    return temp;
-}
-
-// Function to extract modem index from mmcli -L output
-int getModemIndex()
-{
-    std::string command_output;
-    std::string mmcli_command = "mmcli -L";
-
-    // Run mmcli -L and read the output
-    FILE *pipe = popen(mmcli_command.c_str(), "r");
-    if (!pipe)
+    // Parse the temperature value from the line
+    size_t pos = line.find("Temperature ");
+    if (pos == std::string::npos)
     {
-        std::cerr << "Error executing command: " << mmcli_command << std::endl;
+        std::cerr << "Error: Unexpected file format." << std::endl;
         return -1;
     }
 
-    char buffer[128];
-    while (fgets(buffer, sizeof(buffer), pipe) != nullptr)
+    try
     {
-        command_output += buffer;
+        int temperature = std::stoi(line.substr(pos + 12)); // Extract temperature after "Temperature "
+        return temperature;
     }
-
-    pclose(pipe);
-
-    // Parse the output to find the modem index
-    std::istringstream iss(command_output);
-    std::string line;
-    while (std::getline(iss, line))
+    catch (const std::exception& e)
     {
-        std::cout << line << std::endl;
-        size_t found = line.find("/org/freedesktop/ModemManager1/Modem/");
-        if (found != std::string::npos)
-        {
-            size_t index_start = found + sizeof("/org/freedesktop/ModemManager1/Modem/") - 1;
-            size_t index_end = line.find(" -", index_start);
-            std::string index_str = line.substr(index_start, index_end - index_start);
-            return std::stoi(index_str);
-        }
+        std::cerr << "Error: Failed to parse temperature: " << e.what() << std::endl;
+        return -1;
     }
-
-    return -1; // Modem index not found
 }
 
-ModemStats getModemStats(int modemIndex)
-{
-    char command[64];
-    sprintf(command, "mmcli -m %d --signal-get", modemIndex);
-    FILE *pipe = popen(command, "r");
-    if (!pipe)
-    {
-        std::cerr << "Error executing command: mmcli --signal-get" << std::endl;
-        return {0};
+void getSignalStrength(int& rssi, int& snr) {
+    const char* command = "qmicli --device=/dev/cdc-wdm0 --nas-get-signal-strength";
+
+    // Open a pipe to execute the command
+    FILE* fp = popen(command, "r");
+    if (fp == nullptr) {
+        std::cerr << "Failed to run command" << std::endl;
+        rssi = -1;  // Return -1 if command fails
+        snr = -1;   // Return -1 if command fails
+        return;
     }
-    char mmcli_output[256];
-    std::string result = "";
-    while (fgets(mmcli_output, sizeof(mmcli_output), pipe) != nullptr)
-    {
-        result += mmcli_output;
+
+    // Read the output of the command line by line
+    char buffer[256];
+    std::string output;
+    while (fgets(buffer, sizeof(buffer), fp) != nullptr) {
+        output += buffer;
     }
-    pclose(pipe);
+	std::cout<< buffer;
+    // Close the pipe
+    fclose(fp);
 
-    ModemStats ms;
+    // Log the raw output for debugging
+    std::cout << "Command Output:\n" << output << std::endl;
 
-    std::regex rssiRegex("rssi: ([\\d.-]+) dBm");
-    std::regex rsrqRegex("rsrq: ([\\d.-]+) dB");
-    std::regex rsrpRegex("rsrp: ([\\d.-]+) dBm");
-    std::regex snRegex("s/n: ([\\d.-]+) dB");
+    // Use regex to extract RSSI and SNR values
+    std::regex rssiRegex("RSSI:\\s*.*?([-\\d]+) dBm");
+    std::regex snrRegex("SNR:\\s*.*?([\\d\\.]+) dB");
+    std::smatch match;
 
-    // Match objects
-    std::smatch rssiMatch, rsrqMatch, rsrpMatch, snMatch;
+    // Parse RSSI
+    if (std::regex_search(output, match, rssiRegex) && match.size() > 1) {
+        rssi = std::stoi(match[1].str());
+    } else {
+        std::cerr << "Failed to parse RSSI" << std::endl;
+        rssi = -1;
+    }
 
-    if (std::regex_search(result, rssiMatch, rssiRegex))
-        ms.rssi = std::stoi(rssiMatch[1]);
-
-    if (std::regex_search(result, rsrqMatch, rsrqRegex))
-        ms.rsrq = std::stoi(rsrqMatch[1]);
-
-    if (std::regex_search(result, rsrpMatch, rsrpRegex))
-        ms.rsrp = std::stoi(rsrpMatch[1]);
-
-    if (std::regex_search(result, snMatch, snRegex))
-        ms.snr = std::stoi(snMatch[1]);
-    return ms;
+    // Parse SNR
+    if (std::regex_search(output, match, snrRegex) && match.size() > 1) {
+        snr = static_cast<int>(std::stof(match[1].str()));
+    } else {
+        std::cerr << "Failed to parse SNR" << std::endl;
+        snr = -1;
+    }
 }

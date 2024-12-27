@@ -77,12 +77,17 @@ struct Telemetry
 };
 Telemetry tel = { 0 };
 std::mutex sharedMutex;
-int serCells = 4; // 4S default
+int serCells = 5; // 4S default
+//Domo
+double homeLat = 48.4145948, homeLon = 17.6957299;
 
-double homeLat = 48.000000, homeLon = 17.000000;
+//Pole
+//double homeLat = 48.413256, homeLon = 17.692330;
+//Soporna
+//, 
 
 
-double pinLat = 48.999999, pinLon = 17.999999;
+double pinLat = 48.477106, pinLon = 17.553499;
 #ifndef NO_CONTROLLER
 Controller controller(0);
 #endif
@@ -430,7 +435,6 @@ int main(int argc, char* argv[])
 				buffer.insert(buffer.end(), &rxbuffer1[0], &rxbuffer1[bytesRead]);
 				CheckPayloads(buffer);
 			}
-			std::cout << messageToSend;
 			if (sendto(serverSocket1, messageToSend.c_str(), messageToSend.length(), 0, (struct sockaddr*)&clientAddr1, clientAddrLen1) == SOCKET_ERROR)
 			{
 				int err = WSAGetLastError();
@@ -623,7 +627,7 @@ void RenderText(HWND hwnd) {
 	int distanceToHome = calculateHaversine((double)tel.latitude / 10000000.0, (double)tel.longitude / 10000000.0, homeLat, homeLon);
 	swprintf(leftBuffer, 512, L"🌡️%4d °C\n↓%4d KB/s\n↑%4d KB/s\n\n\n%4.1fV 🔋 %4.2fV\n%4.1fA  %4dmAh\n\nRSSI %4d\nSNR %5d",
 		tel.pi_temp, tel.pi_read_speed, tel.pi_write_speed, ((float)tel.voltage) / 10, ((float)tel.voltage) / (10 * serCells), ((float)tel.current) / 10, tel.capacity, tel.pi_rssi, tel.pi_snr);
-	swprintf(centerBuffer, 512, L"%s\n%s\n|\n\n\n\n%s\n\n\n\n\n\n\n\n\n%s", convert_to_wstring(tel.flightMode).c_str(), Compass(tel.heading / 100).c_str(), bottomText.c_str(), controller.GetFlags().c_str());
+	swprintf(centerBuffer, 512, L"%s\n%s\n|\n\n\n\n%s\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n%s", convert_to_wstring(tel.flightMode).c_str(), Compass(tel.heading / 100).c_str(), bottomText.c_str(), controller.GetFlags().c_str());
 	swprintf(rightBuffer, 512, L"%s\n\nLat%10.6f\nLon%10.6f\n↕️%4dm 🧭%3d°\n🛰️%4d­­\n⏱%4d km/h\n%3.1f km/h/A\n🏠%5dm\n\n\nP %5.1f°\nR %5.1f°\nY %5.1f°", convert_to_wstring(ctime(&currentTime)).c_str(), ((float)tel.latitude) / 10000000.f, ((float)tel.longitude) / 10000000.f, tel.altitude, tel.heading / 100, tel.satellites, tel.groundspeed / 10, (tel.groundspeed / 10) / (((float)tel.current) / 10), distanceToHome, RADTODEG(tel.pitch) / 10000.f, RADTODEG(tel.roll) / 10000.f, RADTODEG(tel.yaw) / 10000.f);
 
 
@@ -796,9 +800,9 @@ void TraccarUpdate()
 	{
 		{
 			std::lock_guard<std::mutex> lock(sharedMutex);
-			snprintf(requestPath, sizeof(requestPath), "/?id=123456789&timestamp=%d&lat=%f&lon=%f&speed=%d&altitude=%d", (int)time(NULL), ((double)tel.latitude) / 10000000.0, ((double)tel.longitude) / 10000000.0, tel.groundspeed / 10, tel.altitude);
+			snprintf(requestPath, sizeof(requestPath), "/?id=0192837465&timestamp=%d&lat=%f&lon=%f&speed=%d&altitude=%d", (int)time(NULL), ((double)tel.latitude) / 10000000.0, ((double)tel.longitude) / 10000000.0, tel.groundspeed / 10, tel.altitude);
 		}
-		if (Http_Post("your_ddns", 8082, requestPath, NULL, 0, buffer, sizeof(buffer)) < 0)
+		if (Http_Post("tutos.ddns.net", 8082, requestPath, NULL, 0, buffer, sizeof(buffer)) < 0)
 			fprintf(stderr, "send location to traccar fail\n");
 		std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	}
