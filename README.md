@@ -363,4 +363,4 @@ gst-launch-1.0.exe udpsrc port=2222 ! application/x-rtp,encoding-name=H264,paylo
 
 
 ## Troubleshooting
-[Discord](https://discord.gg/Z7jq2a89)
+[Discord](https://discord.gg/3YTfeUXQ7p)
