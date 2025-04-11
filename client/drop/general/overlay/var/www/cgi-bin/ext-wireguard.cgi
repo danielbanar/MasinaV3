@@ -2,7 +2,7 @@
 <%in p/common.cgi %>
 
 <%
-page_title="Config File Editor"
+page_title="Config File Editor & Wireguard Settings"
 config_file="/root/config.txt"
 
 if [ "$REQUEST_METHOD" = "POST" ]; then
@@ -15,6 +15,14 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
                 redirect_back "error" "Failed to write config file"
             fi
             exit
+            ;;
+        reload)
+            output=$(wg setconf wg0 /etc/wireguard.conf 2>&1)
+            if [ $? -eq 0 ]; then
+                redirect_back "success" "Wireguard configuration has been reloaded."
+            else
+                redirect_back "danger" "Failed to reload Wireguard configuration: $output"
+            fi
             ;;
     esac
     exit
@@ -52,7 +60,14 @@ fi
                 <h6 class="text-muted">/etc/wireguard.conf</h6>
             </div>
             <div class="card-body p-0">
-                <pre class="m-0"><% ex "cat /etc/wireguard.conf" %></pre>
+                <pre class="small"><% ex "cat /etc/wireguard.conf" %></pre>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <a class="btn btn-secondary mt-2" href="fw-editor.cgi?f=<%= /etc/wireguard.conf %>">Edit Wireguard Configuration</a>
+                <form action="<%= $SCRIPT_NAME %>" method="post">
+                    <input type="hidden" name="action" value="reload">
+                    <% button_submit "Reload Wireguard Configuration" "success" %>
+                </form>
             </div>
         </div>
 
@@ -61,7 +76,10 @@ fi
                 <h6 class="text-muted">/etc/network/interfaces.d/wg0</h6>
             </div>
             <div class="card-body p-0">
-                <pre class="m-0"><% ex "cat /etc/network/interfaces.d/wg0" %></pre>
+                <pre class="small"><% ex "cat /etc/network/interfaces.d/wg0" %></pre>
+            </div>
+            <div class="row">
+                <p><a class="btn btn-secondary mt-2" href="fw-editor.cgi?f=<%= /etc/network/interfaces.d/wg0 %>">Edit Interface</a></p>
             </div>
         </div>
     </div>
